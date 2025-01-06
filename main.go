@@ -19,7 +19,16 @@ type Item struct {
 	Price    float64 `json:"price"`
 }
 
-var db *sql.DB
+// DB is an interface that captures the database operations we need
+type DB interface {
+	Query(query string, args ...interface{}) (*sql.Rows, error)
+	QueryRow(query string, args ...interface{}) *sql.Row
+	Exec(query string, args ...interface{}) (sql.Result, error)
+	Ping() error
+	Close() error
+}
+
+var db DB
 
 func main() {
 	// Load environment variables - only in development
@@ -58,7 +67,7 @@ func main() {
 	r := mux.NewRouter()
 
 	// Health check endpoint for Kubernetes
-	r.HandleFunc("/health", healthCheck).Methods("GET")
+	r.HandleFunc("/health", MmHealthCheck).Methods("GET")
 
 	// API routes
 	r.HandleFunc("/items", getItems).Methods("GET")
@@ -73,7 +82,7 @@ func main() {
 	log.Fatal(http.ListenAndServe(":"+port, r))
 }
 
-func healthCheck(w http.ResponseWriter, r *http.Request) {
+func MmHealthCheck(w http.ResponseWriter, r *http.Request) {
 	if err := db.Ping(); err != nil {
 		respondWithError(w, http.StatusServiceUnavailable, "Database connection failed")
 		return
@@ -108,6 +117,10 @@ func getItems(w http.ResponseWriter, r *http.Request) {
 	rows, err := db.Query("SELECT id, name, quantity, price FROM items")
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if rows == nil {
+		respondWithJSON(w, http.StatusOK, items)
 		return
 	}
 	defer rows.Close()

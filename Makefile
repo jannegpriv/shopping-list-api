@@ -1,4 +1,4 @@
-.PHONY: build run test clean docker-build docker-run
+.PHONY: build run test test-docker clean docker-build docker-run docker-down docker-clean test-endpoints
 
 # Go parameters
 GOCMD=go
@@ -12,8 +12,15 @@ all: test build
 build:
 	$(GOBUILD) -o $(BINARY_NAME) -v
 
+run:
+	$(GOBUILD) -o $(BINARY_NAME)
+	./$(BINARY_NAME)
+
 test:
 	$(GOTEST) -v ./...
+
+test-docker: build
+	docker-compose run --rm api-test
 
 clean:
 	$(GOCLEAN)
@@ -47,3 +54,8 @@ test-endpoints:
 	@echo "\n\nGetting all items:"
 	curl http://localhost:8080/items
 	@echo "\n"
+	curl -X POST http://localhost:8080/items \
+		-H "Content-Type: application/json" \
+		-d '{"name":"Test Item","quantity":1,"price":9.99}'
+	@echo "\n"
+	curl http://localhost:8080/items
